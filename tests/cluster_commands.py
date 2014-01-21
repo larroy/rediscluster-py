@@ -46,16 +46,18 @@ class ClusterCommandsTestCase(unittest.TestCase):
 
     def test_masters_only(self):
         client = self.get_client(mastersonly=True)
-        for alias, server in iteritems(client.cluster['nodes']):
+        for node in client.cluster['nodes']:
+            alias = node['name']
+            address = node['address']
             if 'master_of' in client.cluster and alias not in client.cluster['master_of']:
                 continue
-            self.assertEquals(client.cluster['nodes'][alias], client.cluster['slaves'][alias + '_slave'])
+            self.assertEquals(address, client.cluster['slaves'][alias + '_slave'])
 
-    def test_getnodefor(self):
+    def test_getnodenumberfor(self):
         self.client['bar'] = 'foo'
-        node = self.client.getnodefor('bar')
+        node = self.client.getnodenumberfor('bar')
         from redis import StrictRedis
-        rd = StrictRedis(db=4, **config.cluster['nodes'][list(node.keys())[0]])
+        rd = StrictRedis(db=4, **config.cluster['nodes'][node]['address'])
         self.assertEquals(self.client['bar'], rd['bar'])
 
     def test_get_and_set(self):
@@ -76,12 +78,12 @@ class ClusterCommandsTestCase(unittest.TestCase):
 
     def test_hash_tag(self):
         self.client['bar{foo}'] = 'bar'
-        if itervalues(self.client.getnodefor('foo')) != itervalues(self.client.getnodefor('bar')):
+        if self.client.getnodenumberfor('foo') != self.client.getnodenumberfor('bar'):
             self.assertEquals(self.client.get('bar'), None)
         self.assertEquals(self.client['bar{foo}'], b('bar'))
         # checking bar on the right node
         from redis import StrictRedis
-        rd = StrictRedis(db=4, **list(self.client.getnodefor('foo').values())[0])
+        rd = StrictRedis(db=4, **config.cluster['nodes'][self.client.getnodenumberfor('foo')]['address'])
         self.assertEquals(rd['bar'], self.client['bar{foo}'])
 
     def test_getitem_and_setitem(self):
@@ -183,14 +185,14 @@ class ClusterCommandsTestCase(unittest.TestCase):
         self.client['a'] = 'foo'
         self.client['b'] = 'bar'
         kno = 0
-        knohash = {}
+        seen = {}
         for node, info in iteritems(self.client.info()):
             self.assert_(isinstance(info, dict))
             try:
-                k = info['db4']['keys']
-                if k and node in self.client.cluster['nodes'] and str(self.client.cluster['nodes'][node]) not in knohash:
-                    kno += k
-                    knohash[str(self.client.cluster['nodes'][node])] = k
+                nkeys = info['db4']['keys']
+                if nkeys and node in map(lambda x: x['name'], self.client.cluster['nodes']) and node not in seen:
+                    kno += nkeys
+                    seen[node] = nkeys
             except KeyError:
                 pass
 

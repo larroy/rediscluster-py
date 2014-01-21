@@ -7,6 +7,13 @@ from redis._compat import (
 from redis.client import list_or_args
 
 
+class CRC32Hasher:
+    def __init__(self):
+        pass
+
+    def __call__(self, key, nservers):
+        return (binascii.crc32(b(key)) & 0xffffffff) % nservers
+
 class StrictRedisCluster:
     """
     Implementation of the Redis Cluster Client using redis.StrictRedis
@@ -93,12 +100,13 @@ class StrictRedisCluster:
         'time': 'time', 'client_list': 'client_list'
     }
 
-    def __init__(self, cluster={}, db=0, mastersonly=False):
+    def __init__(self, cluster={}, db=0, mastersonly=False, hasher = CRC32Hasher()):
         # raise exception when wrong server hash
         if 'nodes' not in cluster:
             raise Exception(
                 "rediscluster: Please set a correct array of redis cluster.")
 
+        self._hasher = hasher
         self.cluster = cluster
         have_master_of = 'master_of' in self.cluster
         self.no_servers = len(self.cluster['master_of']) if have_master_of else len(self.cluster['nodes'])
@@ -108,12 +116,14 @@ class StrictRedisCluster:
         self.cluster['slaves'] = {}
 
         # connect to all servers
-        for alias, server in iteritems(self.cluster['nodes']):
+        for node in self.cluster['nodes']:
+            alias = node['name']
+            address = node['address']
 
             if have_master_of and alias not in self.cluster['master_of']:
                 continue
 
-            server_str = str(server)
+            server_str = str(address)
             if server_str in redises_cons:
                 self.redises[alias] = redises_cons[server_str]['master']
                 self.redises[alias +
@@ -123,12 +133,12 @@ class StrictRedisCluster:
             else:
                 try:
                     # connect to master
-                    self.__redis = redis.StrictRedis(db=db, **server)
+                    self.__redis = redis.StrictRedis(db=db, **address)
                     if not mastersonly and not have_master_of:
                         info = self.__redis.info()
                         if info['role'] != 'master':
                             raise redis.DataError(
-                                "rediscluster: server %s is not a master." % (server,))
+                                "rediscluster: server %s is not a master." % (address,))
 
                     self.redises[alias] = self.__redis
                     redises_cons[server_str] = {}
@@ -163,7 +173,7 @@ class StrictRedisCluster:
 
                     if not slave_connected:
                         self.redises[alias + '_slave'] = self.redises[alias]
-                        self.cluster['slaves'][alias + '_slave'] = server
+                        self.cluster['slaves'][alias + '_slave'] = address
                         redises_cons[server_str][
                             'slave'] = self.redises[alias + '_slave']
                         redises_cons[server_str]['slave_node'] = self.cluster[
@@ -171,7 +181,7 @@ class StrictRedisCluster:
 
                 except redis.RedisError as e:
                     raise redis.ConnectionError(
-                        "rediscluster cannot connect to: %s %s" % (server, e))
+                        "rediscluster cannot connect to: %s %s" % (address, e))
 
     def __getattr__(self, name, *args, **kwargs):
         """
@@ -270,13 +280,12 @@ class StrictRedisCluster:
 
     def _getnodenamefor(self, name):
         "Return the node name where the ``name`` would land to"
-        return 'node_' + str(
-            (abs(binascii.crc32(b(name)) & 0xffffffff) % self.no_servers) + 1)
+        nodenum = self._hasher(name, self.no_servers)
+        return self.cluster['nodes'][nodenum]['name']
 
-    def getnodefor(self, name):
-        "Return the node where the ``name`` would land to"
-        node = self._getnodenamefor(name)
-        return {node: self.cluster['nodes'][node]}
+    def getnodenumberfor(self, name):
+        "Return the node number where the ``name`` would land to"
+        return self._hasher(name, self.no_servers)
 
     def __setitem__(self, name, value):
         "Set the value at key ``name`` to ``value``"
