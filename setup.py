@@ -31,7 +31,7 @@ setup(
     download_url=('http://pypi.python.org/packages/source/r/rediscluster/rediscluster-%s.tar.gz' % __version__),
     install_requires=[
         'redis>=2.4.0',
-        'hiredis',
+        #'hiredis',
     ],
     author='Salimane Adjao Moustapha',
     author_email='me@salimane.com',
