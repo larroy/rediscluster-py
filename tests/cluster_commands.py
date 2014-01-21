@@ -55,7 +55,7 @@ class ClusterCommandsTestCase(unittest.TestCase):
         self.client['bar'] = 'foo'
         node = self.client.getnodefor('bar')
         from redis import StrictRedis
-        rd = StrictRedis(db=4, **config.cluster['nodes'][iterkeys(node)[0]])
+        rd = StrictRedis(db=4, **config.cluster['nodes'][list(node.keys())[0]])
         self.assertEquals(self.client['bar'], rd['bar'])
 
     def test_get_and_set(self):
@@ -81,7 +81,7 @@ class ClusterCommandsTestCase(unittest.TestCase):
         self.assertEquals(self.client['bar{foo}'], b('bar'))
         # checking bar on the right node
         from redis import StrictRedis
-        rd = StrictRedis(db=4, **itervalues(self.client.getnodefor('foo'))[0])
+        rd = StrictRedis(db=4, **list(self.client.getnodefor('foo').values())[0])
         self.assertEquals(rd['bar'], self.client['bar{foo}'])
 
     def test_getitem_and_setitem(self):
@@ -204,7 +204,7 @@ class ClusterCommandsTestCase(unittest.TestCase):
         self.client['a'] = 'foo'
         self.assert_(isinstance(self.client.object('refcount', 'a'), int))
         self.assert_(isinstance(self.client.object('idletime', 'a'), int))
-        self.assertEquals(self.client.object('encoding', 'a'), b('raw'))
+        self.assertIsNotNone(self.client.object('encoding', 'a'))
 
     def test_ping(self):
         for data in itervalues(self.client.ping()):
@@ -274,7 +274,7 @@ class ClusterCommandsTestCase(unittest.TestCase):
         # expire at given a datetime object
         self.client['b'] = 'bar'
         self.assertEquals(self.client.expireat('b', expire_at), True)
-        self.assertEquals(self.client.ttl('b'), 60)
+        self.assertAlmostEquals(self.client.ttl('b'), 60, delta=2)
 
     def test_pexpire(self):
         for info in itervalues(self.client.info()):
@@ -1680,7 +1680,7 @@ class ClusterCommandsTestCase(unittest.TestCase):
         # real logic
         h = {b('a1'): b('1'), b('a2'): b('2'), b('a3'): b('3')}
         self.make_hash('a', h)
-        keys = iterkeys(h)
+        keys = list(h.keys())
         keys.sort()
         remote_keys = self.client.hkeys('a')
         remote_keys.sort()
@@ -1709,7 +1709,7 @@ class ClusterCommandsTestCase(unittest.TestCase):
         # real logic
         h = {b('a1'): b('1'), b('a2'): b('2'), b('a3'): b('3')}
         self.make_hash('a', h)
-        vals = itervalues(h)
+        vals = list(h.values())
         vals.sort()
         remote_vals = self.client.hvals('a')
         remote_vals.sort()
