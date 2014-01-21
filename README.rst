@@ -1,5 +1,8 @@
-rediscluster-py
-===============
+Fork of rediscluster-py
+========================
+
+This fork allows for a configurable hashing function to be passed as an argument
+
 
 a Python interface to a Cluster of Redis key-value stores.
 
@@ -57,10 +60,10 @@ Getting Started
     >>> import rediscluster
     >>> cluster = {
     ...          # node names
-    ...          'nodes' : { # masters
-    ...                      'node_1' : {'host' : '127.0.0.1', 'port' : 63791},
-    ...                      'node_2' : {'host' : '127.0.0.1', 'port' : 63792},
-    ...                    }
+    ...          'nodes' : [ # masters
+    ...                      {'name': 'node_1', 'address': {'host' : '127.0.0.1', 'port' : 6379}},
+    ...                      {'name': 'node_2', 'address': {'host' : '127.0.0.1', 'port' : 6380}},
+    ...                    ]
     ...     }
     >>> r = rediscluster.StrictRedisCluster(cluster=cluster, db=0)
     >>> r.set('foo', 'bar')
@@ -94,8 +97,7 @@ There is also support to only use masters even if read redis commands are issued
 Partitioning Algorithm
 ----------------------
 
-``rediscluster`` doesn't used a consistent hashing like some other libraries. In order to map every given key to the appropriate Redis node, the algorithm used,
-based on crc32 and modulo, is :
+``rediscluster`` The default hashing function is:
 
 ::
 
@@ -107,8 +109,8 @@ A function ``getnodefor`` is provided to get the node a particular key will be/h
 
 ::
 
-    >>> r.getnodefor('foo')
-    {'node_2': {'host': '127.0.0.1', 'port': 63792}}
+    >>> r.getnodenamefor('foo')
+    'node_1'
     >>>
 
 Hash Tags
@@ -149,12 +151,12 @@ To do so it processes the related involved redis servers at interface level.
     2
     >>> r.smembers('foobar')
     set(['a1', 'a3'])
-    >>> r.getnodefor('foo')
-    {'node_2': {'host': '127.0.0.1', 'port': 63792}}
-    >>> r.getnodefor('bar')
-    {'node_1': {'host': '127.0.0.1', 'port': 63791}}
-    >>> r.getnodefor('foobar')
-    {'node_2': {'host': '127.0.0.1', 'port': 63792}}
+    >>> r.getnodenamefor('foo')
+    'node_2'
+    >>> r.getnodenamefor('bar')
+    'node_1'
+    >>> r.getnodenamefor('foobar')
+    'node_2'
     >>>
 
 Redis-Sharding & Redis-Copy

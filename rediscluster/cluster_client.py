@@ -245,7 +245,7 @@ class StrictRedisCluster:
                     args = tuple(L)
 
                 # get the node number
-                node = self._getnodenamefor(hkey)
+                node = self.getnodenamefor(hkey)
                 if name in StrictRedisCluster._write_keys:
                     redisent = self.redises[node]
                 elif name in StrictRedisCluster._read_keys:
@@ -278,11 +278,12 @@ class StrictRedisCluster:
 
         return function
 
-    def _getnodenamefor(self, name):
+    def getnodenamefor(self, name):
         "Return the node name where the ``name`` would land to"
         nodenum = self._hasher(name, self.no_servers)
         return self.cluster['nodes'][nodenum]['name']
 
+        
     def getnodenumberfor(self, name):
         "Return the node number where the ``name`` would land to"
         return self._hasher(name, self.no_servers)
@@ -307,7 +308,7 @@ class StrictRedisCluster:
 
     def object(self, infotype, key):
         "Return the encoding, idletime, or refcount about the key"
-        redisent = self.redises[self._getnodenamefor(key) + '_slave']
+        redisent = self.redises[self.getnodenamefor(key) + '_slave']
         return getattr(redisent, 'object')(infotype, key)
 
     def _rc_brpoplpush(self, src, dst, timeout=0):
